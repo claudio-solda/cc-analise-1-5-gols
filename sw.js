@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pre-jogo-gols-v2';
+const CACHE_VERSION = 'pre-jogo-gols-v3';
 const CORE_ASSETS = [
   './pre-jogo-gols.html',
   './manifest.json',
