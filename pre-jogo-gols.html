@@ -284,6 +284,7 @@
 
 <script>
 const API_BASE = 'https://api.football-data.org/v4';
+const CORS_PROXY = 'https://corsproxy.io/?url=';
 let apiKey = localStorage.getItem('fd_api_key') || '';
 document.getElementById('apiKey').value = apiKey;
 
@@ -307,7 +308,9 @@ async function apiGet(path){
   if(!apiKey){
     throw new Error('Cole e salve sua chave da API antes de buscar dados.');
   }
-  const res = await fetch(API_BASE + path, {
+  const targetUrl = API_BASE + path;
+  const proxiedUrl = CORS_PROXY + encodeURIComponent(targetUrl);
+  const res = await fetch(proxiedUrl, {
     headers: { 'X-Auth-Token': apiKey }
   });
   if(res.status === 429){
