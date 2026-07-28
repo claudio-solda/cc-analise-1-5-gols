@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Pré-Jogo · +1,5 Gols</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b3d2e">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pitch: #0b3d2e;
+    --pitch-dark: #082a20;
+    --chalk: #f2efe6;
+    --gold: #c9a227;
+    --navy: #101820;
+    --card: #14251d;
+    --line: rgba(242,239,230,0.14);
+    --green-ok: #4caf6d;
+    --amber: #d9a441;
+    --red: #c1543f;
+    --muted: #9fb3a8;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: radial-gradient(ellipse at top, var(--pitch) 0%, var(--pitch-dark) 65%, var(--navy) 100%);
+    color: var(--chalk);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height:100vh;
+    padding-bottom: 60px;
+  }
+  .field-lines{
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0 79px, rgba(255,255,255,0.035) 79px 81px);
+  }
+  header{
+    padding: 28px 20px 18px;
+    text-align:center;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1{
+    font-family:'Oswald', sans-serif;
+    font-weight:700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+  }
+  header .sub{
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  main{
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 18px 16px;
+  }
+  .card{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card h2{
+    font-family:'Oswald', sans-serif;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin: 0 0 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  label{
+    display:block;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  input[type=text], select{
+    width:100%;
+    padding: 10px 12px;
+    background: var(--navy);
+    border: 1px solid var(--line);
+    color: var(--chalk);
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+  }
+  button{
+    background: var(--gold);
+    color: var(--pitch-dark);
+    border:none;
+    padding: 11px 16px;
+    border-radius: 6px;
+    font-weight:600;
+    font-family:'Oswald',sans-serif;
+    text-transform:uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.85rem;
+    cursor:pointer;
+    width:100%;
+  }
+  button:disabled{ opacity:0.5; cursor:default; }
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--gold);
+    color: var(--gold);
+  }
+  .status{
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 8px;
+    min-height: 16px;
+  }
+  .status.err{ color: var(--red); }
+  .status.ok{ color: var(--green-ok); }
+  .match-list{ display:flex; flex-direction:column; gap:8px; }
+  .match-item{
+    background: var(--navy);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:0.85rem;
+  }
+  .match-item:active{ background: #1a2c22; }
+  .match-item .date{ color: var(--muted); font-size:0.7rem; font-family:'IBM Plex Mono',monospace; }
+  .teams{ font-weight:500; }
+  .result-header{
+    text-align:center;
+    margin-bottom: 14px;
+  }
+  .result-header .teams-big{
+    font-family:'Oswald',sans-serif;
+    font-size: 1.1rem;
+    text-transform:uppercase;
+  }
+  .gauge-wrap{
+    display:flex;
+    justify-content:center;
+    margin: 10px 0 18px;
+  }
+  .gauge{ position:relative; width:170px; height:170px; }
+  .gauge svg{ transform: rotate(-90deg); }
+  .gauge-label{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+  }
+  .gauge-label .pct{
+    font-family:'Oswald',sans-serif;
+    font-size: 2.1rem;
+    font-weight:700;
+  }
+  .gauge-label .tag{
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stat-row{
+    display:flex;
+    justify-content:space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+  }
+  .stat-row:last-child{ border-bottom:none; }
+  .stat-row .val{
+    font-family:'IBM Plex Mono',monospace;
+    color: var(--gold);
+  }
+  .disclaimer{
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align:center;
+    line-height:1.5;
+    padding: 12px 8px 0;
+  }
+  details summary{
+    cursor:pointer;
+    color: var(--muted);
+    font-size: 0.8rem;
+    padding: 4px 0;
+  }
+  .empty{
+    text-align:center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 20px 0;
+  }
+</style>
+</head>
+<body class="field-lines">
+
+<header>
+  <h1>Pré-Jogo · +1,5 Gols</h1>
+  <div class="sub">Análise estatística baseada em desempenho recente</div>
+</header>
+
+<main>
+
+  <div class="card">
+    <h2 onclick="toggleSettings()" style="cursor:pointer;">⚙ Configuração <span id="settingsChevron">▾</span></h2>
+    <div id="settingsBody">
+      <label for="apiKey">Chave da API (football-data.org — gratuita)</label>
+      <input type="text" id="apiKey" placeholder="Cole sua X-Auth-Token aqui">
+      <button class="ghost" onclick="saveKey()">Salvar chave neste aparelho</button>
+      <div class="status" id="keyStatus"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Competição</h2>
+    <select id="competition">
+      <option value="BSA">Brasileirão Série A</option>
+      <option value="CL">Champions League</option>
+      <option value="PL">Premier League</option>
+      <option value="PD">La Liga</option>
+      <option value="BL1">Bundesliga</option>
+      <option value="SA">Serie A (Itália)</option>
+      <option value="FL1">Ligue 1</option>
+    </select>
+    <button onclick="loadFixtures()" id="loadBtn">Buscar próximos jogos</button>
+    <div class="status" id="fixturesStatus"></div>
+  </div>
+
+  <div class="card" id="fixturesCard" style="display:none;">
+    <h2>Próximos jogos</h2>
+    <div class="match-list" id="fixturesList"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none;">
+    <h2>Análise</h2>
+    <div class="result-header">
+      <div class="teams-big" id="resultTeams"></div>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <svg width="170" height="170" viewBox="0 0 170 170">
+          <circle cx="85" cy="85" r="72" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="14"/>
+          <circle id="gaugeArc" cx="85" cy="85" r="72" fill="none" stroke="var(--green-ok)" stroke-width="14"
+                  stroke-linecap="round" stroke-dasharray="452" stroke-dashoffset="452"/>
+        </svg>
+        <div class="gauge-label">
+          <div class="pct" id="gaugePct">--%</div>
+          <div class="tag">chance +1,5 gols</div>
+        </div>
+      </div>
+    </div>
+    <div id="statBreakdown"></div>
+    <details>
+      <summary>Como isso foi calculado?</summary>
+      <div style="font-size:0.78rem; color:var(--muted); line-height:1.6; padding-top:6px;">
+        Usamos a média de gols marcados/sofridos de cada time em jogos recentes (casa/fora),
+        combinada com o histórico de confrontos diretos, para estimar quantos gols o jogo tende a ter (modelo de Poisson).
+        A partir dessa expectativa, calculamos a chance de o jogo terminar com 2 gols ou mais.
+      </div>
+    </details>
+  </div>
+
+  <div class="disclaimer">
+    Estimativa estatística baseada em dados históricos. Não é garantia de resultado — futebol é imprevisível.
+  </div>
+
+  <div class="disclaimer" style="opacity:0.7; margin-top:6px;">
+    Dados fornecidos pela Football-Data.org API
+  </div>
+
+</main>
+
+<script>
+const API_BASE = 'https://api.football-data.org/v4';
+let apiKey = localStorage.getItem('fd_api_key') || '';
+document.getElementById('apiKey').value = apiKey;
+
+function toggleSettings(){
+  const body = document.getElementById('settingsBody');
+  const chev = document.getElementById('settingsChevron');
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? 'block' : 'none';
+  chev.textContent = hidden ? '▾' : '▸';
+}
+
+function saveKey(){
+  apiKey = document.getElementById('apiKey').value.trim();
+  localStorage.setItem('fd_api_key', apiKey);
+  const st = document.getElementById('keyStatus');
+  st.textContent = apiKey ? 'Chave salva neste aparelho.' : 'Chave removida.';
+  st.className = 'status ok';
+}
+
+async function apiGet(path){
+  if(!apiKey){
+    throw new Error('Cole e salve sua chave da API antes de buscar dados.');
+  }
+  const res = await fetch(API_BASE + path, {
+    headers: { 'X-Auth-Token': apiKey }
+  });
+  if(res.status === 429){
+    throw new Error('Limite de requisições atingido (10/min no plano grátis). Espere um minuto e tente de novo.');
+  }
+  if(res.status === 403){
+    throw new Error('Chave inválida ou sem acesso a essa competição no plano grátis.');
+  }
+  if(!res.ok){
+    throw new Error('Erro ao buscar dados (' + res.status + ').');
+  }
+  return res.json();
+}
+
+async function loadFixtures(){
+  const comp = document.getElementById('competition').value;
+  const status = document.getElementById('fixturesStatus');
+  const btn = document.getElementById('loadBtn');
+  status.textContent = 'Buscando...';
+  status.className = 'status';
+  btn.disabled = true;
+  document.getElementById('resultCard').style.display = 'none';
+  try{
+    const data = await apiGet('/competitions/' + comp + '/matches?status=SCHEDULED');
+    const matches = (data.matches || []).slice(0, 12);
+    const list = document.getElementById('fixturesList');
+    list.innerHTML = '';
+    if(matches.length === 0){
+      list.innerHTML = '<div class="empty">Nenhum jogo agendado encontrado.</div>';
+    } else {
+      matches.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'match-item';
+        const d = new Date(m.utcDate);
+        const dateStr = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}) + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+        div.innerHTML = '<div><div class="teams">' + m.homeTeam.shortName || m.homeTeam.name +
+          ' x ' + (m.awayTeam.shortName || m.awayTeam.name) + '</div><div class="date">' + dateStr + '</div></div><div>›</div>';
+        div.onclick = () => analyzeMatch(m);
+        list.appendChild(div);
+      });
+    }
+    document.getElementById('fixturesCard').style.display = 'block';
+    status.textContent = '';
+  } catch(e){
+    status.textContent = e.message;
+    status.className = 'status err';
+  }
+  btn.disabled = false;
+}
+
+function sumGoals(matches, teamId, venue){
+  // venue: 'HOME' or 'AWAY' — returns {scored, conceded, games}
+  let scored = 0, conceded = 0, games = 0;
+  matches.forEach(m => {
+    if(!m.score || !m.score.fullTime || m.score.fullTime.home === null) return;
+    const isHome = m.homeTeam.id === teamId;
+    if(venue === 'HOME' && !isHome) return;
+    if(venue === 'AWAY' && isHome) return;
+    const gf = isHome ? m.score.fullTime.home : m.score.fullTime.away;
+    const ga = isHome ? m.score.fullTime.away : m.score.fullTime.home;
+    scored += gf; conceded += ga; games++;
+  });
+  return { scored, conceded, games };
+}
+
+function poissonOver1_5(lambda){
+  const p0 = Math.exp(-lambda);
+  const p1 = lambda * Math.exp(-lambda);
+  return 1 - p0 - p1;
+}
+
+async function analyzeMatch(match){
+  const status = document.getElementById('fixturesStatus');
+  status.textContent = 'Analisando ' + match.homeTeam.name + ' x ' + match.awayTeam.name + '...';
+  status.className = 'status';
+  try{
+    const homeId = match.homeTeam.id, awayId = match.awayTeam.id;
+
+    const [homeMatches, awayMatches, h2h] = await Promise.all([
+      apiGet('/teams/' + homeId + '/matches?status=FINISHED&limit=10'),
+      apiGet('/teams/' + awayId + '/matches?status=FINISHED&limit=10'),
+      apiGet('/matches/' + match.id + '/head2head?limit=8')
+    ]);
+
+    const homeStats = sumGoals(homeMatches.matches || [], homeId, 'HOME');
+    const awayStats = sumGoals(awayMatches.matches || [], awayId, 'AWAY');
+
+    const avgScoredHome = homeStats.games ? homeStats.scored / homeStats.games : 1.2;
+    const avgConcededHome = homeStats.games ? homeStats.conceded / homeStats.games : 1.0;
+    const avgScoredAway = awayStats.games ? awayStats.scored / awayStats.games : 1.0;
+    const avgConcededAway = awayStats.games ? awayStats.conceded / awayStats.games : 1.2;
+
+    const lambdaHome = (avgScoredHome + avgConcededAway) / 2;
+    const lambdaAway = (avgScoredAway + avgConcededHome) / 2;
+    let lambdaModel = lambdaHome + lambdaAway;
+
+    // Head-to-head blend
+    const h2hMatches = (h2h.matches || []).filter(m => m.score && m.score.fullTime && m.score.fullTime.home !== null);
+    let h2hAvg = null;
+    if(h2hMatches.length >= 2){
+      const totalGoals = h2hMatches.reduce((acc, m) => acc + m.score.fullTime.home + m.score.fullTime.away, 0);
+      h2hAvg = totalGoals / h2hMatches.length;
+      lambdaModel = (lambdaModel * 0.7) + (h2hAvg * 0.3);
+    }
+
+    const prob = poissonOver1_5(lambdaModel);
+    const pct = Math.round(prob * 100);
+
+    document.getElementById('resultTeams').textContent = match.homeTeam.name + ' vs ' + match.awayTeam.name;
+    document.getElementById('gaugePct').textContent = pct + '%';
+
+    const arc = document.getElementById('gaugeArc');
+    const circumference = 452;
+    arc.setAttribute('stroke-dashoffset', circumference - (circumference * pct / 100));
+    arc.setAttribute('stroke', pct >= 70 ? 'var(--green-ok)' : pct >= 50 ? 'var(--amber)' : 'var(--red)');
+
+    const breakdown = document.getElementById('statBreakdown');
+    breakdown.innerHTML = '';
+    const rows = [
+      ['Gols esperados no jogo (est.)', lambdaModel.toFixed(2)],
+      [match.homeTeam.name + ' — média marcados em casa', avgScoredHome.toFixed(2) + ' (' + homeStats.games + ' jogos)'],
+      [match.homeTeam.name + ' — média sofridos em casa', avgConcededHome.toFixed(2)],
+      [match.awayTeam.name + ' — média marcados fora', avgScoredAway.toFixed(2) + ' (' + awayStats.games + ' jogos)'],
+      [match.awayTeam.name + ' — média sofridos fora', avgConcededAway.toFixed(2)],
+      ['Confrontos diretos analisados', h2hMatches.length + (h2hAvg ? ' (média ' + h2hAvg.toFixed(2) + ' gols/jogo)' : ' — insuficiente')]
+    ];
+    rows.forEach(([label, val]) => {
+      const row = document.createElement('div');
+      row.className = 'stat-row';
+      row.innerHTML = '<span>' + label + '</span><span class="val">' + val + '</span>';
+      breakdown.appendChild(row);
+    });
+
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'start'});
+    status.textContent = '';
+  } catch(e){
+    status.textContent = e.message;
+    status.className = 'status err';
+  }
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.log('SW falhou:', err));
+  });
+}
+</script>
+</body>
+</html>
