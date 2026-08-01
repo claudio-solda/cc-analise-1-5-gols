@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Pré-Jogo · +1,5 Gols</title>
+<title>Pré-Jogo · Gols</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0b3d2e">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -95,6 +95,29 @@
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.9rem;
     margin-bottom: 12px;
+  }
+  .market-toggle{
+    display:flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .market-toggle button{
+    flex:1;
+    background: var(--navy);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 9px 8px;
+    border-radius: 6px;
+    font-family:'Oswald',sans-serif;
+    text-transform:uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.8rem;
+    cursor:pointer;
+  }
+  .market-toggle button.active{
+    background: var(--gold);
+    color: var(--pitch-dark);
+    border-color: var(--gold);
   }
   button{
     background: var(--gold);
@@ -207,7 +230,7 @@
 <body class="field-lines">
 
 <header>
-  <h1>Pré-Jogo · +1,5 Gols</h1>
+  <h1>Pré-Jogo · Gols</h1>
   <div class="sub">Análise estatística baseada em desempenho recente</div>
 </header>
 
@@ -224,6 +247,12 @@
   </div>
 
   <div class="card">
+    <h2>Mercado de gols</h2>
+    <div class="market-toggle">
+      <button type="button" id="marketBtn15" class="active" onclick="setMarket('1.5')">+1,5 Gols</button>
+      <button type="button" id="marketBtn25" onclick="setMarket('2.5')">+2,5 Gols</button>
+    </div>
+
     <h2>Competição</h2>
     <select id="competition">
       <option value="BSA">Brasileirão Série A</option>
@@ -233,6 +262,11 @@
       <option value="BL1">Bundesliga</option>
       <option value="SA">Serie A (Itália)</option>
       <option value="FL1">Ligue 1</option>
+      <option value="PPL">Primeira Liga (Portugal)</option>
+      <option value="DED">Eredivisie (Holanda)</option>
+      <option value="ELC">Championship (Inglaterra)</option>
+      <option value="WC">Copa do Mundo</option>
+      <option value="EC">Eurocopa</option>
     </select>
     <button onclick="loadFixtures()" id="loadBtn">Buscar próximos jogos</button>
     <div class="status" id="fixturesStatus"></div>
@@ -257,14 +291,14 @@
         </svg>
         <div class="gauge-label">
           <div class="pct" id="gaugePct">--%</div>
-          <div class="tag">chance +1,5 gols</div>
+          <div class="tag" id="gaugeTag">chance +1,5 gols</div>
         </div>
       </div>
     </div>
     <div id="statBreakdown"></div>
     <details>
       <summary>Como isso foi calculado?</summary>
-      <div style="font-size:0.78rem; color:var(--muted); line-height:1.6; padding-top:6px;">
+      <div style="font-size:0.78rem; color:var(--muted); line-height:1.6; padding-top:6px;" id="calcExplain">
         Usamos a média de gols marcados/sofridos de cada time em jogos recentes (casa/fora),
         combinada com o histórico de confrontos diretos, para estimar quantos gols o jogo tende a ter (modelo de Poisson).
         A partir dessa expectativa, calculamos a chance de o jogo terminar com 2 gols ou mais.
@@ -287,6 +321,28 @@ const API_BASE = 'https://api.football-data.org/v4';
 const CORS_PROXY = 'https://corsproxy.io/?url=';
 let apiKey = localStorage.getItem('fd_api_key') || '';
 document.getElementById('apiKey').value = apiKey;
+
+let currentMarket = '1.5'; // '1.5' ou '2.5'
+let lastLambdaModel = null;
+let lastMatch = null;
+let lastRows = null;
+
+function setMarket(market){
+  currentMarket = market;
+  document.getElementById('marketBtn15').classList.toggle('active', market === '1.5');
+  document.getElementById('marketBtn25').classList.toggle('active', market === '2.5');
+  const minGoals = market === '1.5' ? '2' : '3';
+  document.getElementById('calcExplain').innerHTML =
+    'Usamos a média de gols marcados/sofridos de cada time em jogos recentes (casa/fora), ' +
+    'combinada com o histórico de confrontos diretos, para estimar quantos gols o jogo tende a ter (modelo de Poisson). ' +
+    'A partir dessa expectativa, calculamos a chance de o jogo terminar com ' + minGoals + ' gols ou mais.';
+  // Se já existe uma análise carregada, recalcula sem gastar nova chamada de API
+  if(lastLambdaModel !== null){
+    renderResult(lastLambdaModel, lastMatch, lastRows);
+  } else {
+    document.getElementById('gaugeTag').textContent = 'chance +' + market.replace('.', ',') + ' gols';
+  }
+}
 
 function toggleSettings(){
   const body = document.getElementById('settingsBody');
@@ -362,7 +418,7 @@ async function loadFixtures(){
 }
 
 function sumGoals(matches, teamId, venue){
-  // venue: 'HOME' or 'AWAY' — returns {scored, conceded, games}
+  // venue: 'HOME' ou 'AWAY' — retorna {scored, conceded, games}
   let scored = 0, conceded = 0, games = 0;
   matches.forEach(m => {
     if(!m.score || !m.score.fullTime || m.score.fullTime.home === null) return;
@@ -376,10 +432,24 @@ function sumGoals(matches, teamId, venue){
   return { scored, conceded, games };
 }
 
-function poissonOver1_5(lambda){
-  const p0 = Math.exp(-lambda);
-  const p1 = lambda * Math.exp(-lambda);
-  return 1 - p0 - p1;
+// Probabilidade de Poisson P(X = k)
+function poissonPMF(lambda, k){
+  return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+}
+function factorial(n){
+  let f = 1;
+  for(let i = 2; i <= n; i++) f *= i;
+  return f;
+}
+
+// Probabilidade de o total de gols ser MAIOR que "threshold"
+// (ex: threshold=1 => +1,5 gols; threshold=2 => +2,5 gols)
+function poissonOverThreshold(lambda, threshold){
+  let cumulative = 0;
+  for(let k = 0; k <= threshold; k++){
+    cumulative += poissonPMF(lambda, k);
+  }
+  return 1 - cumulative;
 }
 
 async function analyzeMatch(match){
@@ -407,7 +477,7 @@ async function analyzeMatch(match){
     const lambdaAway = (avgScoredAway + avgConcededHome) / 2;
     let lambdaModel = lambdaHome + lambdaAway;
 
-    // Head-to-head blend
+    // Mescla com o histórico de confrontos diretos
     const h2hMatches = (h2h.matches || []).filter(m => m.score && m.score.fullTime && m.score.fullTime.home !== null);
     let h2hAvg = null;
     if(h2hMatches.length >= 2){
@@ -416,19 +486,6 @@ async function analyzeMatch(match){
       lambdaModel = (lambdaModel * 0.7) + (h2hAvg * 0.3);
     }
 
-    const prob = poissonOver1_5(lambdaModel);
-    const pct = Math.round(prob * 100);
-
-    document.getElementById('resultTeams').textContent = match.homeTeam.name + ' vs ' + match.awayTeam.name;
-    document.getElementById('gaugePct').textContent = pct + '%';
-
-    const arc = document.getElementById('gaugeArc');
-    const circumference = 452;
-    arc.setAttribute('stroke-dashoffset', circumference - (circumference * pct / 100));
-    arc.setAttribute('stroke', pct >= 70 ? 'var(--green-ok)' : pct >= 50 ? 'var(--amber)' : 'var(--red)');
-
-    const breakdown = document.getElementById('statBreakdown');
-    breakdown.innerHTML = '';
     const rows = [
       ['Gols esperados no jogo (est.)', lambdaModel.toFixed(2)],
       [match.homeTeam.name + ' — média marcados em casa', avgScoredHome.toFixed(2) + ' (' + homeStats.games + ' jogos)'],
@@ -437,20 +494,44 @@ async function analyzeMatch(match){
       [match.awayTeam.name + ' — média sofridos fora', avgConcededAway.toFixed(2)],
       ['Confrontos diretos analisados', h2hMatches.length + (h2hAvg ? ' (média ' + h2hAvg.toFixed(2) + ' gols/jogo)' : ' — insuficiente')]
     ];
-    rows.forEach(([label, val]) => {
-      const row = document.createElement('div');
-      row.className = 'stat-row';
-      row.innerHTML = '<span>' + label + '</span><span class="val">' + val + '</span>';
-      breakdown.appendChild(row);
-    });
 
-    document.getElementById('resultCard').style.display = 'block';
-    document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'start'});
+    lastLambdaModel = lambdaModel;
+    lastMatch = match;
+    lastRows = rows;
+
+    renderResult(lambdaModel, match, rows);
     status.textContent = '';
   } catch(e){
     status.textContent = e.message;
     status.className = 'status err';
   }
+}
+
+function renderResult(lambdaModel, match, rows){
+  const threshold = currentMarket === '1.5' ? 1 : 2;
+  const prob = poissonOverThreshold(lambdaModel, threshold);
+  const pct = Math.round(prob * 100);
+
+  document.getElementById('resultTeams').textContent = match.homeTeam.name + ' vs ' + match.awayTeam.name;
+  document.getElementById('gaugePct').textContent = pct + '%';
+  document.getElementById('gaugeTag').textContent = 'chance +' + currentMarket.replace('.', ',') + ' gols';
+
+  const arc = document.getElementById('gaugeArc');
+  const circumference = 452;
+  arc.setAttribute('stroke-dashoffset', circumference - (circumference * pct / 100));
+  arc.setAttribute('stroke', pct >= 70 ? 'var(--green-ok)' : pct >= 50 ? 'var(--amber)' : 'var(--red)');
+
+  const breakdown = document.getElementById('statBreakdown');
+  breakdown.innerHTML = '';
+  rows.forEach(([label, val]) => {
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.innerHTML = '<span>' + label + '</span><span class="val">' + val + '</span>';
+    breakdown.appendChild(row);
+  });
+
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 if('serviceWorker' in navigator){
